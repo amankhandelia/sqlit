@@ -36,6 +36,11 @@ class TestKeymapProvider:
         assert keymap.action("focus_query") is not None
         assert keymap.action("focus_explorer") is not None
 
+    def test_default_keymap_binds_y_to_yank_tree_node_in_tree_context(self):
+        """y in the tree context should yank the cursor's node (column name / table DDL)."""
+        keymap = get_keymap()
+        assert keymap.action("yank_tree_node") == "y"
+
     def test_custom_keymap_can_be_set(self):
         """Custom keymap provider can be injected."""
         custom_keymap = MockKeymapProvider(

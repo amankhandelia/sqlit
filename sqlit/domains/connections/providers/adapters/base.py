@@ -444,6 +444,17 @@ class DatabaseAdapter(ABC):
         """
         return []
 
+    def get_table_ddl(
+        self, conn: Any, table: str, database: str | None = None, schema: str | None = None
+    ) -> str | None:
+        """Get the CREATE statement (DDL) for a table or view.
+
+        Returns the DDL string if available, or ``None`` when the dialect
+        cannot introspect object definitions. Default implementation
+        returns ``None``; override in subclasses that can fetch DDL.
+        """
+        return None
+
     def get_index_definition(
         self, conn: Any, index_name: str, table_name: str, database: str | None = None
     ) -> dict[str, Any]:

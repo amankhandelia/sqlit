@@ -25,6 +25,12 @@ class TreeFocusedState(State):
             label="Visual",
             help="Enter visual selection mode",
         )
+        self.allows(
+            "yank_tree_node",
+            lambda app: app.tree_node_kind in ("column", "table", "view"),
+            label="Yank",
+            help="Copy column name or table DDL",
+        )
 
     def is_active(self, app: InputContext) -> bool:
         return app.focus == "explorer" and not app.tree_filter_active

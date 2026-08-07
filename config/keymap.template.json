@@ -22,6 +22,7 @@
         "enter_tree_visual_mode": "v",
         "clear_connection_selection": "escape",
         "select_table": "s",
+        "yank_tree_node": "y",
         "refresh_tree": [
           "f",
           "R"
