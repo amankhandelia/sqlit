@@ -664,6 +664,96 @@ class SQLServerAdapter(DatabaseAdapter):
             for row in cursor.fetchall()
         ]
 
+    def get_table_ddl(
+        self, conn: Any, table: str, database: str | None = None, schema: str | None = None
+    ) -> str | None:
+        """Get the CREATE statement for a SQL Server table or view.
+
+        OBJECT_DEFINITION returns the source for views, triggers, and
+        procedures but is NULL for tables, so tables are reconstructed from
+        INFORMATION_SCHEMA.COLUMNS plus primary-key metadata. The
+        reconstruction covers column names, data types (with precision/
+        scale where applicable), NULLability, column defaults, and the
+        PRIMARY KEY constraint — enough to be useful when yanked.
+        """
+        cursor = self._get_cursor_for_database(conn, database)
+        schema = schema or "dbo"
+
+        # Views: OBJECT_DEFINITION returns the original CREATE VIEW text.
+        cursor.execute(
+            "SELECT OBJECT_DEFINITION(OBJECT_ID(QUOTENAME(?) + '.' + QUOTENAME(?)))",
+            (schema, table),
+        )
+        row = cursor.fetchone()
+        view_def = row[0] if row else None
+        if view_def:
+            return str(view_def)
+
+        # Tables: reconstruct from information_schema.
+        cursor.execute(
+            "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, "
+            "NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE, COLUMN_DEFAULT "
+            "FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? "
+            "ORDER BY ORDINAL_POSITION",
+            (schema, table),
+        )
+        columns = cursor.fetchall()
+        if not columns:
+            return None
+
+        cursor.execute(
+            "SELECT kcu.COLUMN_NAME "
+            "FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc "
+            "JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu "
+            "  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME "
+            "  AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA "
+            "WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY' "
+            "AND tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? "
+            "ORDER BY kcu.ORDINAL_POSITION",
+            (schema, table),
+        )
+        pk_columns = [row[0] for row in cursor.fetchall()]
+
+        lines: list[str] = []
+        for col_name, data_type, char_len, num_prec, num_scale, is_nullable, default in columns:
+            type_str = self._mssql_type_str(data_type, char_len, num_prec, num_scale)
+            null_str = "" if is_nullable == "YES" else " NOT NULL"
+            default_str = f" DEFAULT {default}" if default is not None else ""
+            lines.append(f"    [{col_name}] {type_str}{null_str}{default_str}")
+
+        if pk_columns:
+            pk_cols = ", ".join(f"[{c}]" for c in pk_columns)
+            lines.append(f"    CONSTRAINT [PK_{table}] PRIMARY KEY ({pk_cols})")
+
+        cols_block = ",\n".join(lines)
+        return f"CREATE TABLE [{schema}].[{table}] (\n{cols_block}\n)"
+
+    @staticmethod
+    def _mssql_type_str(
+        data_type: str,
+        char_len: int | None,
+        num_prec: int | None,
+        num_scale: int | None,
+    ) -> str:
+        """Render a SQL Server column type string with size/precision where relevant."""
+        upper = (data_type or "").upper()
+        if upper in ("CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "BINARY", "VARBINARY"):
+            if char_len is not None:
+                return f"{data_type}({char_len if char_len != -1 else 'MAX'})"
+            return data_type
+        if upper in ("DECIMAL", "NUMERIC"):
+            if num_scale is not None and num_prec is not None:
+                return f"{data_type}({num_prec}, {num_scale})"
+            if num_prec is not None:
+                return f"{data_type}({num_prec})"
+            return data_type
+        if upper in ("FLOAT", "REAL", "TIME", "DATETIME2", "DATETIMEOFFSET"):
+            if num_prec is not None:
+                return f"{data_type}({num_prec})"
+            return data_type
+        return data_type
+
     def get_index_definition(
         self, conn: Any, index_name: str, table_name: str, database: str | None = None
     ) -> dict[str, Any]:

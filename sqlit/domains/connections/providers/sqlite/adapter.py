@@ -214,6 +214,25 @@ class SQLiteAdapter(DatabaseAdapter):
                 )
         return results
 
+    def get_table_ddl(
+        self, conn: Any, table: str, database: str | None = None, schema: str | None = None
+    ) -> str | None:
+        """Get the CREATE statement for a SQLite table or view.
+
+        Schema parameter is ignored for SQLite. Reads the ``sql`` column
+        from ``sqlite_master`` for either a 'table' or 'view' row.
+        """
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type IN ('table', 'view') AND name = ?",
+            (table,),
+        )
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            return None
+        return str(row[0])
+
     def get_index_definition(
         self, conn: Any, index_name: str, table_name: str, database: str | None = None
     ) -> dict[str, Any]:
