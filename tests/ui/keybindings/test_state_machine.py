@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from sqlit.core.input_context import InputContext
 from sqlit.core.vim import VimMode
 from sqlit.domains.shell.state import UIStateMachine
@@ -213,6 +215,50 @@ class TestEmptyExplorerFooter:
         left, _right = sm.get_display_bindings(ctx)
         actions = [b.action for b in left]
         assert "enter_tree_visual_mode" in actions
+
+
+class TestYankTreeNode:
+    """yank_tree_node should be gated by the cursor's tree-node kind."""
+
+    @pytest.mark.parametrize("kind", ["column", "table", "view"])
+    def test_yank_allowed_on_column_and_table_nodes(self, kind):
+        sm = UIStateMachine()
+        ctx = make_context(focus="explorer", tree_node_kind=kind)
+        assert sm.check_action(ctx, "yank_tree_node") is True
+
+    @pytest.mark.parametrize(
+        "kind", [None, "connection", "database", "folder", "schema", "index", "trigger", "sequence"]
+    )
+    def test_yank_blocked_on_other_nodes(self, kind):
+        sm = UIStateMachine()
+        ctx = make_context(focus="explorer", tree_node_kind=kind)
+        assert sm.check_action(ctx, "yank_tree_node") is False
+
+    def test_yank_blocked_when_query_focused(self):
+        sm = UIStateMachine()
+        ctx = make_context(focus="query", tree_node_kind="table")
+        assert sm.check_action(ctx, "yank_tree_node") is False
+
+    def test_yank_shown_in_footer_on_column_node(self):
+        sm = UIStateMachine()
+        ctx = make_context(focus="explorer", tree_node_kind="column")
+        left, _right = sm.get_display_bindings(ctx)
+        actions = [b.action for b in left]
+        assert "yank_tree_node" in actions
+
+    def test_yank_shown_in_footer_on_table_node(self):
+        sm = UIStateMachine()
+        ctx = make_context(focus="explorer", tree_node_kind="table")
+        left, _right = sm.get_display_bindings(ctx)
+        actions = [b.action for b in left]
+        assert "yank_tree_node" in actions
+
+    def test_yank_hidden_in_footer_on_connection_node(self):
+        sm = UIStateMachine()
+        ctx = make_context(focus="explorer", tree_node_kind="connection")
+        left, _right = sm.get_display_bindings(ctx)
+        actions = [b.action for b in left]
+        assert "yank_tree_node" not in actions
 
 
 class TestEditQueryInEditorLeaderCommand:

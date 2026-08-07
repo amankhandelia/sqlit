@@ -209,6 +209,39 @@ class DuckDBAdapter(DatabaseAdapter):
         )
         return [SequenceInfo(name=row[0]) for row in result.fetchall()]
 
+    def get_table_ddl(
+        self, conn: Any, table: str, database: str | None = None, schema: str | None = None
+    ) -> str | None:
+        """Get the CREATE statement for a DuckDB table or view.
+
+        Reads the ``sql`` column from ``duckdb_tables()`` (tables) and
+        ``duckdb_views()`` (views), since the caller doesn't tell us the
+        object type. Returns the first match, or None if neither has a
+        stored definition (e.g. the table was created via a function the
+        catalog doesn't retain the source for).
+        """
+        schema = schema or "main"
+
+        result = conn.execute(
+            "SELECT sql FROM duckdb_tables() "
+            "WHERE schema_name = ? AND table_name = ?",
+            (schema, table),
+        )
+        row = result.fetchone()
+        if row and row[0]:
+            return str(row[0])
+
+        result = conn.execute(
+            "SELECT sql FROM duckdb_views() "
+            "WHERE schema_name = ? AND view_name = ?",
+            (schema, table),
+        )
+        row = result.fetchone()
+        if row and row[0]:
+            return str(row[0])
+
+        return None
+
     def get_index_definition(
         self, conn: Any, index_name: str, table_name: str, database: str | None = None
     ) -> dict[str, Any]:

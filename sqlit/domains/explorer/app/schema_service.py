@@ -87,6 +87,24 @@ class ExplorerSchemaService:
             database,
         )
 
+    def get_table_ddl(
+        self,
+        database: str | None,
+        schema: str | None,
+        name: str,
+    ) -> str | None:
+        """Fetch the CREATE statement for a table or view, if the dialect supports it."""
+        inspector = self.session.provider.schema_inspector
+        getter = getattr(inspector, "get_table_ddl", None)
+        if not callable(getter):
+            return None
+        db_arg = self._resolve_db_arg(database)
+        return self._run_with_retry(
+            lambda: getter(self.session.connection, name, db_arg, schema),
+            database,
+        )
+
+
     def list_folder_items(self, folder_type: str, database: str | None) -> list[Any]:
         inspector = self.session.provider.schema_inspector
         caps = self.session.provider.capabilities

@@ -357,6 +357,76 @@ class TreeMixin(TreeSchemaMixin, TreeLabelMixin):
             tree_object_info.show_sequence_info(self, data)
             return
 
+    def action_yank_tree_node(self: TreeMixinHost) -> None:
+        """Yank (copy) the cursor's tree node to the clipboard.
+
+        - On a column node: copies the column name.
+        - On a table/view node: fetches and copies the table/view DDL
+          (CREATE statement) when the dialect supports it; falls back to
+          the qualified table name if DDL is unavailable.
+        """
+        node = self.object_tree.cursor_node
+        if not node or not node.data:
+            return
+
+        kind = self._get_node_kind(node)
+        data = node.data
+
+        if kind == "column":
+            name = getattr(data, "name", None)
+            if not name:
+                return
+            self._copy_tree_text(name, what="Column name")
+            return
+
+        if kind in ("table", "view"):
+            name = getattr(data, "name", None)
+            if not name:
+                return
+            ddl = self._fetch_table_ddl(data)
+            if ddl:
+                self._copy_tree_text(ddl, what=f"{kind.capitalize()} DDL")
+            else:
+                schema = getattr(data, "schema", None)
+                qualified = name if not schema else f"{schema}.{name}"
+                self._copy_tree_text(qualified, what=f"{kind.capitalize()} name")
+            return
+
+    def _fetch_table_ddl(self: TreeMixinHost, data: Any) -> str | None:
+        """Fetch DDL for a table/view node, or None if unavailable."""
+        schema_service = self._get_schema_service()
+        if not schema_service:
+            return None
+        database = getattr(data, "database", None)
+        schema = getattr(data, "schema", None)
+        name = getattr(data, "name", None)
+        if not name:
+            return None
+        try:
+            return schema_service.get_table_ddl(database, schema, name)
+        except Exception:
+            return None
+
+    def _copy_tree_text(self: TreeMixinHost, text: str, *, what: str) -> None:
+        """Copy text to the clipboard and notify the user."""
+        from sqlit.shared.ui.clipboard import copy_to_system_clipboard
+
+        copied = False
+        try:
+            copied = copy_to_system_clipboard(text)
+        except Exception:
+            copied = False
+        # Also hand off to Textual's OSC52 path so remote sessions work.
+        try:
+            self.copy_to_clipboard(text)
+            copied = True
+        except Exception:
+            pass
+        if copied:
+            self.notify(f"{what} copied")
+        else:
+            self.notify(f"Failed to copy {what.lower()}", severity="error")
+
     def action_use_database(self: TreeMixinHost) -> None:
         """Toggle the selected database as the default for the current connection."""
         node = self.object_tree.cursor_node

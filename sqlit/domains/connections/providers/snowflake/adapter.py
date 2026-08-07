@@ -234,6 +234,38 @@ class SnowflakeAdapter(CursorBasedAdapter):
         cursor.execute(sql)
         return [SequenceInfo(name=row[0]) for row in cursor.fetchall()]
 
+    def get_table_ddl(
+        self, conn: Any, table: str, database: str | None = None, schema: str | None = None
+    ) -> str | None:
+        """Get the CREATE statement for a Snowflake table or view.
+
+        Uses Snowflake's built-in ``GET_DDL`` function, which returns the
+        original DDL for tables and views. Since the caller doesn't tell us
+        the object type, we try ``TABLE`` first and fall back to ``VIEW``.
+        """
+        cursor = conn.cursor()
+        schema = schema or "PUBLIC"
+        qualified = self._snowflake_qualified_name(database, schema, table)
+
+        for object_type in ("TABLE", "VIEW"):
+            try:
+                cursor.execute("SELECT GET_DDL(?, ?)", (object_type, qualified))
+                row = cursor.fetchone()
+            except Exception:
+                continue
+            if row and row[0]:
+                return str(row[0])
+        return None
+
+    def _snowflake_qualified_name(self, database: str | None, schema: str, table: str) -> str:
+        """Build a dot-delimited qualified name for GET_DDL (no quoting)."""
+        parts: list[str] = []
+        if database:
+            parts.append(database)
+        parts.append(schema)
+        parts.append(table)
+        return ".".join(parts)
+
     def execute_query(self, conn: Any, query: str, max_rows: int | None = None) -> tuple[list[str], list[tuple], bool]:
         """Execute query."""
         cursor = conn.cursor()
