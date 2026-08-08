@@ -357,6 +357,14 @@
         "value": "y",
         "field": "f",
         "all": "a"
+      },
+      "ty": {
+        "name": "n",
+        "ddl": "d"
+      },
+      "cy": {
+        "name": "n",
+        "type": "t"
       }
     }
   }

@@ -195,7 +195,7 @@ sqlit connections delete "MyConnection"
 | `Esc` | Back to NORMAL mode |
 | `e` / `q` / `r` | Focus Explorer / Query / Results |
 | `s` | SELECT TOP 100 from table |
-| `y` | Yank column name / table DDL (in Explorer) |
+| `y` | Yank menu: column name / data type, table name / DDL (in Explorer) |
 | `h` | Query history |
 | `d` | Clear query |
 | `n` | New query (clear all) |

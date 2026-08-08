@@ -43,6 +43,7 @@ class TreeMixin(TreeSchemaMixin, TreeLabelMixin):
     _expanded_state_save_timer: Any | None = None
     _schema_service: Any | None = None
     _schema_service_session: Any | None = None
+    _yank_target_node: Any | None = None
 
     def _emit_debug(self: TreeMixinHost, name: str, **data: Any) -> None:
         emit = getattr(self, "emit_debug_event", None)
@@ -574,39 +575,119 @@ class TreeMixin(TreeSchemaMixin, TreeLabelMixin):
             return
 
     def action_yank_tree_node(self: TreeMixinHost) -> None:
-        """Yank (copy) the cursor's tree node to the clipboard.
+        """Open the yank submenu for the cursor's tree node.
 
-        - On a column node: copies the column name.
-        - On a table/view node: fetches and copies the table/view DDL
-          (CREATE statement) when the dialect supports it; falls back to
-          the qualified table name if DDL is unavailable.
+        - On a column node: opens the ``cy`` menu (column name / data type).
+        - On a table/view node: opens the ``ty`` menu (name / DDL).
+        - On any other node: does nothing.
         """
         node = self.object_tree.cursor_node
         if not node or not node.data:
             return
 
         kind = self._get_node_kind(node)
-        data = node.data
-
         if kind == "column":
-            name = getattr(data, "name", None)
-            if not name:
-                return
-            self._copy_tree_text(name, what="Column name")
+            self._yank_target_node = node
+            self._start_leader_pending("cy")
             return
 
         if kind in ("table", "view"):
-            name = getattr(data, "name", None)
-            if not name:
-                return
-            ddl = self._fetch_table_ddl(data)
-            if ddl:
-                self._copy_tree_text(ddl, what=f"{kind.capitalize()} DDL")
-            else:
-                schema = getattr(data, "schema", None)
-                qualified = name if not schema else f"{schema}.{name}"
-                self._copy_tree_text(qualified, what=f"{kind.capitalize()} name")
+            self._yank_target_node = node
+            self._start_leader_pending("ty")
             return
+
+    def _yank_target(self: TreeMixinHost) -> Any | None:
+        """Resolve the node targeted by the open yank menu (or the cursor)."""
+        node = getattr(self, "_yank_target_node", None)
+        if node is not None:
+            return node
+        return self.object_tree.cursor_node
+
+    def _clear_yank_target(self: TreeMixinHost) -> None:
+        """Clear the captured yank target once the menu action has run."""
+        self._yank_target_node = None
+
+    def action_ty_name(self: TreeMixinHost) -> None:
+        """Copy the table/view name (from the ty yank menu)."""
+        self._cancel_leader_pending()
+        node = self._yank_target()
+        self._clear_yank_target()
+        if not node or not node.data:
+            return
+        data = node.data
+        name = getattr(data, "name", None)
+        if not name:
+            return
+        schema = getattr(data, "schema", None)
+        qualified = name if not schema else f"{schema}.{name}"
+        kind = self._get_node_kind(node)
+        what = f"{kind.capitalize()} name" if kind else "Table name"
+        self._copy_tree_text(qualified, what=what)
+
+    def action_ty_ddl(self: TreeMixinHost) -> None:
+        """Copy the table/view DDL (from the ty yank menu)."""
+        self._cancel_leader_pending()
+        node = self._yank_target()
+        self._clear_yank_target()
+        if not node or not node.data:
+            return
+        data = node.data
+        name = getattr(data, "name", None)
+        if not name:
+            return
+        kind = self._get_node_kind(node)
+        ddl = self._fetch_table_ddl(data)
+        if ddl:
+            self._copy_tree_text(ddl, what=f"{kind.capitalize()} DDL")
+        else:
+            schema = getattr(data, "schema", None)
+            qualified = name if not schema else f"{schema}.{name}"
+            self._copy_tree_text(qualified, what=f"{kind.capitalize()} name")
+
+    def action_cy_name(self: TreeMixinHost) -> None:
+        """Copy the column name (from the cy yank menu)."""
+        self._cancel_leader_pending()
+        node = self._yank_target()
+        self._clear_yank_target()
+        if not node or not node.data:
+            return
+        name = getattr(node.data, "name", None)
+        if not name:
+            return
+        self._copy_tree_text(name, what="Column name")
+
+    def action_cy_type(self: TreeMixinHost) -> None:
+        """Copy the column data type (from the cy yank menu)."""
+        self._cancel_leader_pending()
+        node = self._yank_target()
+        self._clear_yank_target()
+        if not node or not node.data:
+            return
+        data_type = self._fetch_column_data_type(node.data)
+        if not data_type:
+            self.notify("Column data type unavailable", severity="warning")
+            return
+        self._copy_tree_text(data_type, what="Column data type")
+
+    def _fetch_column_data_type(self: TreeMixinHost, data: Any) -> str | None:
+        """Fetch the data type for a column node, or None if unavailable."""
+        schema_service = self._get_schema_service()
+        if not schema_service:
+            return None
+        database = getattr(data, "database", None)
+        schema = getattr(data, "schema", None)
+        table = getattr(data, "table", None)
+        name = getattr(data, "name", None)
+        if not table or not name:
+            return None
+        try:
+            columns = schema_service.list_columns(database, schema, table)
+        except Exception:
+            return None
+        for col in columns:
+            if getattr(col, "name", None) == name:
+                return getattr(col, "data_type", None)
+        return None
 
     def _fetch_table_ddl(self: TreeMixinHost, data: Any) -> str | None:
         """Fetch DDL for a table/view node, or None if unavailable."""

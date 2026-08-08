@@ -213,7 +213,7 @@ class UIStateMachine:
         s.binding("<enter>", "Expand node / Connect")
         s.binding(k("new_connection", "n"), "New connection")
         s.binding(k("select_table", "s"), "SELECT TOP 100 (on table/view)")
-        s.binding(k("yank_tree_node", "y"), "Yank column name / table DDL")
+        s.binding(k("yank_tree_node", "y"), "Yank menu (name / DDL / data type)")
         s.binding(k("tree_filter", "/"), "Filter tree")
         s.binding(k("collapse_tree", "z"), "Collapse all nodes")
         s.binding(k("refresh_tree", "f"), "Refresh tree")

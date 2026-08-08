@@ -29,7 +29,7 @@ class TreeFocusedState(State):
             "yank_tree_node",
             lambda app: app.tree_node_kind in ("column", "table", "view"),
             label="Yank",
-            help="Copy column name or table DDL",
+            help="Open yank menu (name / DDL / data type)",
         )
 
     def is_active(self, app: InputContext) -> bool:
