@@ -329,6 +329,12 @@ class DefaultKeymapProvider(KeymapProvider):
             LeaderCommandDef("y", "value", "Copy value", "Copy", menu="vy"),
             LeaderCommandDef("f", "field", "Copy field", "Copy", menu="vy"),
             LeaderCommandDef("a", "all", "Copy all", "Copy", menu="vy"),
+            # ty tree yank menu (on table/view nodes)
+            LeaderCommandDef("n", "name", "Name", "Yank", menu="ty"),
+            LeaderCommandDef("d", "ddl", "DDL", "Yank", menu="ty"),
+            # cy column yank menu (on column nodes)
+            LeaderCommandDef("n", "name", "Column name", "Yank", menu="cy"),
+            LeaderCommandDef("t", "type", "Data type", "Yank", menu="cy"),
         ]
 
     def _build_action_keys(self) -> list[ActionKeyDef]:
