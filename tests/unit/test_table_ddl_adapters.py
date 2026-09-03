@@ -130,7 +130,7 @@ class TestSnowflakeGetTableDDL:
         assert ddl == "CREATE TABLE mydb.PUBLIC.users (id INT)"
         # Only one execute call needed.
         assert cursor.execute.call_count == 1
-        cursor.execute.assert_called_once_with("SELECT GET_DDL(?, ?)", ("TABLE", "mydb.PUBLIC.users"))
+        cursor.execute.assert_called_once_with("SELECT GET_DDL(%s, %s)", ("TABLE", "mydb.PUBLIC.users"))
 
     def test_falls_back_to_view_when_table_returns_null(self):
         adapter = self._make_adapter()
@@ -141,7 +141,7 @@ class TestSnowflakeGetTableDDL:
         assert ddl == "CREATE VIEW mydb.PUBLIC.v AS SELECT 1"
         assert cursor.execute.call_count == 2
         second_call_args = cursor.execute.call_args_list[1][0]
-        assert second_call_args == ("SELECT GET_DDL(?, ?)", ("VIEW", "mydb.PUBLIC.v"))
+        assert second_call_args == ("SELECT GET_DDL(%s, %s)", ("VIEW", "mydb.PUBLIC.v"))
 
     def test_returns_none_when_both_types_return_null(self):
         adapter = self._make_adapter()
@@ -157,7 +157,7 @@ class TestSnowflakeGetTableDDL:
 
         adapter.get_table_ddl(conn, "users", database=None, schema="PUBLIC")
 
-        cursor.execute.assert_called_once_with("SELECT GET_DDL(?, ?)", ("TABLE", "PUBLIC.users"))
+        cursor.execute.assert_called_once_with("SELECT GET_DDL(%s, %s)", ("TABLE", "PUBLIC.users"))
 
     def test_skips_type_on_exception_and_tries_next(self):
         adapter = self._make_adapter()

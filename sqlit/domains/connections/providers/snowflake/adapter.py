@@ -351,7 +351,7 @@ class SnowflakeAdapter(CursorBasedAdapter):
 
         for object_type in ("TABLE", "VIEW"):
             try:
-                cursor.execute("SELECT GET_DDL(?, ?)", (object_type, qualified))
+                cursor.execute("SELECT GET_DDL(%s, %s)", (object_type, qualified))
                 row = cursor.fetchone()
             except Exception:
                 continue
