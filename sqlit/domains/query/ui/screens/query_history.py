@@ -9,7 +9,7 @@ from typing import Any
 from textual.app import ComposeResult
 from rich.text import Text
 from textual.binding import Binding
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import OptionList, Static
 from textual.widgets.option_list import Option
@@ -37,20 +37,38 @@ class QueryHistoryScreen(ModalScreen):
     }
 
     #history-dialog {
-        width: 90;
-        max-width: 90%;
-        height: 80%;
-        max-height: 90%;
+        width: 120;
+        max-width: 95%;
+        height: 24;
+        min-height: 16;
+        max-height: 80%;
+    }
+
+    #history-filter {
+        background: $surface;
+    }
+
+    /* nvim-style split: list sidebar | preview window */
+    #history-split {
+        height: 1fr;
+        width: 1fr;
+    }
+
+    #history-list-pane {
+        width: 32;
+        min-width: 24;
+        max-width: 40%;
+        height: 1fr;
+        background: $surface;
+        border: none;
+        padding: 0;
     }
 
     #history-scroll {
         height: 1fr;
         background: $surface;
         border: none;
-    }
-
-    #history-filter {
-        background: $surface;
+        padding: 0;
     }
 
     #history-list {
@@ -70,14 +88,19 @@ class QueryHistoryScreen(ModalScreen):
         padding: 2;
     }
 
-    #history-preview-container {
-        height: 8;
-        min-height: 8;
-        max-height: 8;
+    #history-preview-pane {
+        width: 1fr;
+        height: 1fr;
         background: $surface-darken-1;
         border: none;
         padding: 1;
-        margin-top: 1;
+    }
+
+    #history-preview-container {
+        height: 1fr;
+        background: $surface-darken-1;
+        border: none;
+        padding: 0;
     }
 
     #history-preview {
@@ -199,18 +222,20 @@ class QueryHistoryScreen(ModalScreen):
 
         with Dialog(id="history-dialog", title=title, shortcuts=shortcuts):
             yield FilterInput(id="history-filter")
-            with VerticalScroll(id="history-scroll"):
-                if self._merged_entries:
-                    options = []
-                    for entry in self._merged_entries:
-                        options.append(self._build_option(entry))
+            with Horizontal(id="history-split"):
+                with Vertical(id="history-list-pane"):
+                    with VerticalScroll(id="history-scroll"):
+                        if self._merged_entries:
+                            options = []
+                            for entry in self._merged_entries:
+                                options.append(self._build_option(entry))
 
-                    yield OptionList(*options, id="history-list")
-                else:
-                    yield Static(empty_message, id="history-empty")
-
-            with VerticalScroll(id="history-preview-container"):
-                yield Static("", id="history-preview")
+                            yield OptionList(*options, id="history-list")
+                        else:
+                            yield Static(empty_message, id="history-empty")
+                with Vertical(id="history-preview-pane"):
+                    with VerticalScroll(id="history-preview-container"):
+                        yield Static("", id="history-preview")
 
     def on_mount(self) -> None:
         if self._merged_entries:
